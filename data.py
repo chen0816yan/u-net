@@ -19,7 +19,7 @@ import skimage
 import skimage.measure
 
 data_path = 'raw/'
-save_path = '/mnt/data1/yihuihe/mnc_small/'
+save_path = '/home/chen/u-net/dataset/'
 image_rows = 420
 image_cols = 580
 
@@ -28,10 +28,12 @@ image_cols = 580
 def create_train_data():
     train_data_path = os.path.join(data_path, 'train')
     images = os.listdir(train_data_path)
-    total = len(images) / 2
+    total = int(len(images) / 2)
 
-    imgs = np.ndarray((total, 1, image_rows, image_cols), dtype=np.uint8)
-    imgs_mask = np.ndarray((total, 1, image_rows, image_cols), dtype=np.uint8)
+    # imgs = np.ndarray((total, 1, image_rows, image_cols), dtype=np.uint8)
+    imgs = np.ndarray((total,image_rows, image_cols,1), dtype=np.uint8)
+    # imgs_mask = np.ndarray((total, 1, image_rows, image_cols), dtype=np.uint8)
+    imgs_mask = np.ndarray((total,image_rows, image_cols,1), dtype=np.uint8)
 
     i = 0
     print('-'*30)
@@ -46,6 +48,10 @@ def create_train_data():
 
         img = np.array([img])
         img_mask = np.array([img_mask])
+
+        img = np.transpose(img,(1,2,0))
+        img_mask = np.transpose(img_mask,(1,2,0))
+
 
         imgs[i] = img
         imgs_mask[i] = img_mask
@@ -66,9 +72,11 @@ def load_train_data():
     return imgs_train, imgs_mask_train
 
 def preprocess(imgs, img_rows,img_cols):
-    imgs_p = np.ndarray((imgs.shape[0],imgs.shape[1],img_rows,img_cols),dtype=np.uint8)
+    # imgs_p = np.ndarray((imgs.shape[0],imgs.shape[1],img_rows,img_cols),dtype=np.uint8)
+    imgs_p = np.ndarray((imgs.shape[0],img_rows,img_cols,imgs.shape[3]),dtype=np.uint8)
     for i in range(imgs.shape[0]):
-        imgs_p[i, 0 ] = cv2.resize(imgs[i,0],(img_cols,img_rows),interpolation=cv2.INTER_CUBIC)
+        # imgs_p[i, 0 ] = cv2.resize(imgs[i,0],(img_cols,img_rows),interpolation=cv2.INTER_CUBIC)
+        imgs_p[i,:,:, 0 ] = cv2.resize(imgs[i,:,:,0],(img_cols,img_rows),interpolation=cv2.INTER_CUBIC)
     return imgs_p
 
 def detseg():
@@ -137,11 +145,11 @@ def detseg():
         bboxes.append(gt_boxes)
         masks.append(instance_masks)
 
-    print("xmax", max_width, max(acc_width))
-    H, xedges, yedges=np.histogram2d(acc_width,acc_height, bins=50)
-    plt.imshow(H, interpolation='nearest', origin='low',
-                extent=[xedges[0], xedges[-1], yedges[0], yedges[-1]])
-    plt.show()
+    #print("xmax", max_width, max(acc_width))
+    #H, xedges, yedges=np.histogram2d(acc_width,acc_height, bins=50)
+    #plt.imshow(H, interpolation='nearest', origin='low',
+                #extent=[xedges[0], xedges[-1], yedges[0], yedges[-1]])
+    #plt.show()
     
     np.save(save_path+'roidb.npy',np.array(bboxes))
     np.save(save_path+'maskdb.npy',np.array(masks))
@@ -151,8 +159,10 @@ def create_test_data():
     images = os.listdir(train_data_path)
     total = len(images)
 
-    imgs = np.ndarray((total, 1, image_rows, image_cols), dtype=np.uint8)
+    # imgs = np.ndarray((total, 1, image_rows, image_cols), dtype=np.uint8)
+    imgs = np.ndarray((total,image_rows, image_cols,1), dtype=np.uint8)
     imgs_id = np.ndarray((total, ), dtype=np.int32)
+    
 
     i = 0
     print('-'*30)
@@ -163,6 +173,7 @@ def create_test_data():
         img = cv2.imread(os.path.join(train_data_path, image_name), cv2.IMREAD_GRAYSCALE)
 
         img = np.array([img])
+        img = np.transpose(img,(1,2,0))
 
         imgs[i] = img
         imgs_id[i] = img_id
@@ -178,12 +189,15 @@ def create_test_data():
 
 
 def load_test_data():
+    out_rows=160
+    out_cols=224
     imgs_test = np.load('imgs_test.npy')
     imgs_id = np.load('imgs_id_test.npy')
+    imgs_test = preprocess(imgs_test, out_rows,out_cols).astype(np.float32)
     return imgs_test, imgs_id
 
 if __name__ == '__main__':
-    # create_train_data()
-    # create_test_data()
+    create_train_data()
+    create_test_data()
 
     detseg()

@@ -3,7 +3,7 @@ from __future__ import print_function
 import cv2
 import numpy as np
 from keras.models import Model
-from keras.layers import Input, merge, Convolution2D, MaxPooling2D, UpSampling2D, Dropout
+from keras.layers import Input, merge, Convolution2D, MaxPooling2D, UpSampling2D, Dropout, Concatenate
 from keras.optimizers import Adam
 from keras.callbacks import ModelCheckpoint, LearningRateScheduler
 from keras import backend as K
@@ -63,7 +63,8 @@ def augmentation(image, imageB, org_width=160,org_height=224, width=190, height=
     # plt.show()
 
 def get_unet():
-    inputs = Input((1, img_rows, img_cols))
+    # inputs = Input((1, img_rows, img_cols))
+    inputs = Input((img_rows, img_cols, 1))
     conv1 = Convolution2D(32, 3, 3, activation='relu', border_mode='same')(inputs)
     conv1 = Convolution2D(32, 3, 3, activation='relu', border_mode='same')(conv1)
     pool1 = MaxPooling2D(pool_size=(2, 2))(conv1)
@@ -82,28 +83,33 @@ def get_unet():
 
     conv5 = Convolution2D(512, 3, 3, activation='relu', border_mode='same')(pool4)
     conv5 = Convolution2D(512, 3, 3, activation='relu', border_mode='same')(conv5)
-    # pool5 = MaxPooling2D(pool_size=(2, 2))(conv5)
+    pool5 = MaxPooling2D(pool_size=(2, 2))(conv5)
 
-    # convdeep = Convolution2D(1024, 3, 3, activation='relu', border_mode='same')(pool5)
-    # convdeep = Convolution2D(1024, 3, 3, activation='relu', border_mode='same')(convdeep)
+    convdeep = Convolution2D(1024, 3, 3, activation='relu', border_mode='same')(pool5)
+    convdeep = Convolution2D(1024, 3, 3, activation='relu', border_mode='same')(convdeep)
     
     # upmid = merge([Convolution2D(512, 2, 2, border_mode='same')(UpSampling2D(size=(2, 2))(convdeep)), conv5], mode='concat', concat_axis=1)
-    # convmid = Convolution2D(512, 3, 3, activation='relu', border_mode='same')(upmid)
-    # convmid = Convolution2D(512, 3, 3, activation='relu', border_mode='same')(convmid)
+    upmid = Concatenate(axis=-1)([Convolution2D(512, 2, 2, border_mode='same')(UpSampling2D(size=(2, 2))(convdeep)), conv5])
+    convmid = Convolution2D(512, 3, 3, activation='relu', border_mode='same')(upmid)
+    convmid = Convolution2D(512, 3, 3, activation='relu', border_mode='same')(convmid)
 
-    up6 = merge([Convolution2D(256, 2, 2,activation='relu', border_mode='same')(UpSampling2D(size=(2, 2))(conv5)), conv4], mode='concat', concat_axis=1)
+    # up6 = merge([Convolution2D(256, 2, 2,activation='relu', border_mode='same')(UpSampling2D(size=(2, 2))(conv5)), conv4], mode='concat', concat_axis=1)
+    up6 = Concatenate(axis=-1)([Convolution2D(256, 2, 2,activation='relu', border_mode='same')(UpSampling2D(size=(2, 2))(conv5)), conv4])
     conv6 = Convolution2D(256, 3, 3, activation='relu', border_mode='same')(up6)
     conv6 = Convolution2D(256, 3, 3, activation='relu', border_mode='same')(conv6)
 
-    up7 = merge([Convolution2D(128, 2, 2,activation='relu', border_mode='same')(UpSampling2D(size=(2, 2))(conv6)), conv3], mode='concat', concat_axis=1)
+    # up7 = merge([Convolution2D(128, 2, 2,activation='relu', border_mode='same')(UpSampling2D(size=(2, 2))(conv6)), conv3], mode='concat', concat_axis=1)
+    up7 = Concatenate(axis=-1)([Convolution2D(128, 2, 2,activation='relu', border_mode='same')(UpSampling2D(size=(2, 2))(conv6)), conv3])
     conv7 = Convolution2D(128, 3, 3, activation='relu', border_mode='same')(up7)
     conv7 = Convolution2D(128, 3, 3, activation='relu', border_mode='same')(conv7)
 
-    up8 = merge([Convolution2D(64, 2, 2,activation='relu', border_mode='same')(UpSampling2D(size=(2, 2))(conv7)), conv2], mode='concat', concat_axis=1)
+    # up8 = merge([Convolution2D(64, 2, 2,activation='relu', border_mode='same')(UpSampling2D(size=(2, 2))(conv7)), conv2], mode='concat', concat_axis=1)
+    up8 = Concatenate(axis=-1)([Convolution2D(64, 2, 2,activation='relu', border_mode='same')(UpSampling2D(size=(2, 2))(conv7)), conv2])
     conv8 = Convolution2D(64, 3, 3, activation='relu', border_mode='same')(up8)
     conv8 = Convolution2D(64, 3, 3, activation='relu', border_mode='same')(conv8)
 
-    up9 = merge([Convolution2D(32, 2, 2,activation='relu', border_mode='same')(UpSampling2D(size=(2, 2))(conv8)), conv1], mode='concat', concat_axis=1)
+    # up9 = merge([Convolution2D(32, 2, 2,activation='relu', border_mode='same')(UpSampling2D(size=(2, 2))(conv8)), conv1], mode='concat', concat_axis=1)
+    up9 = Concatenate(axis=-1)([Convolution2D(32, 2, 2,activation='relu', border_mode='same')(UpSampling2D(size=(2, 2))(conv8)), conv1])
     conv9 = Convolution2D(32, 3, 3, activation='relu', border_mode='same')(up9)
     conv9 = Convolution2D(32, 3, 3, activation='relu', border_mode='same')(conv9)
 
@@ -117,9 +123,11 @@ def get_unet():
 
 
 def preprocess(imgs):
-    imgs_p = np.ndarray((imgs.shape[0], imgs.shape[1], img_rows, img_cols), dtype=np.float)
+    # imgs_p = np.ndarray((imgs.shape[0], imgs.shape[1], img_rows, img_cols), dtype=np.float)
+    imgs_p = np.ndarray((imgs.shape[0], img_rows, img_cols, imgs.shape[1]), dtype=np.float32)
     for i in range(imgs.shape[0]):
-        imgs_p[i, 0] = cv2.resize(imgs[i, 0], (img_cols, img_rows), interpolation=cv2.INTER_CUBIC)
+        # imgs_p[i, 0] = cv2.resize(imgs[i, 0], (img_cols, img_rows), interpolation=cv2.INTER_CUBIC)
+        imgs_p[i,:,:,0] = cv2.resize(imgs[i,:,:,0], (img_cols, img_rows), interpolation=cv2.INTER_CUBIC)
     return imgs_p
 
 
@@ -128,8 +136,8 @@ def train_and_predict():
     print('Loading and preprocessing train data...')
     print('-'*30)
     # imgs_train, imgs_mask_train = load_train_data()
-    imgs_train=np.load("/mnt/data1/yihuihe/mnc/data.npy")
-    imgs_mask_train=np.load("/mnt/data1/yihuihe/mnc/mask.npy")
+    imgs_train=np.load("/home/chen/u-net/dataset/data.npy")
+    imgs_mask_train=np.load("/home/chen/u-net/dataset/mask.npy")
     imgs_train = imgs_train.astype('float32')
     imgs_mask_train = imgs_mask_train.astype('float32')
 
@@ -139,67 +147,71 @@ def train_and_predict():
     # print(np.histogram(imgs_mask_train))
 
     total=imgs_train.shape[0]
-    # imgs_train/=255.
-    # mean = imgs_train.mean()# (0)[np.newaxis,:]  # mean for data centering
-    # std = np.std(imgs_train)  # std for data normalization
-    # imgs_train -= mean
-    # imgs_train /= std
+    imgs_train/=255.
+    mean = imgs_train.mean()# (0)[np.newaxis,:]  # mean for data centering
+    std = np.std(imgs_train)  # std for data normalization
+    imgs_train -= mean
+    imgs_train /= std
 
-    # imgs_mask_train /= 255.  # scale masks to [0, 1]
+    imgs_mask_train /= 255.  # scale masks to [0, 1]
 
     print('-'*30)
     print('Creating and compiling model...')
     print('-'*30)
     model = get_unet()
     
-    # model_checkpoint = ModelCheckpoint('unet.hdf5', monitor='loss',verbose=1, save_best_only=True)
+    model_checkpoint = ModelCheckpoint('/home/chen/u-net/1sttest/unet.hdf5', monitor='loss',verbose=1, save_best_only=True)
 
-    # print('-'*30)
-    # print('Fitting model...')
-    # print('-'*30)
-    # model.fit(imgs_train, imgs_mask_train, batch_size=32, nb_epoch=20, verbose=1, shuffle=True,callbacks=[model_checkpoint])
+    print('-'*30)
+    print('Fitting model...')
+    print('-'*30)
+    model.fit(imgs_train, imgs_mask_train, batch_size=32, nb_epoch=3, verbose=1, shuffle=True,callbacks=[model_checkpoint])
     
-    # batch_size=32
-    # max_iters=10000
-    # for i in range(max_iters):
-    #     data_batch=np.ndarray((batch_size,1,img_rows,img_cols))
-    #     mask_batch=np.ndarray((batch_size,1,img_rows,img_cols))
+    batch_size=3
+    max_iters=3
+    for i in range(max_iters):
+        # data_batch=np.ndarray((batch_size,1,img_rows,img_cols))
+        data_batch=np.ndarray((batch_size,img_rows,img_cols,1))
+        # mask_batch=np.ndarray((batch_size,1,img_rows,img_cols))
+        mask_batch=np.ndarray((batch_size,img_rows,img_cols,1))
         
-    #     for img in range(batch_size):
-    #         idx=np.random.randint(total)
-    #         data_batch[img,0],mask_batch[img,0]=augmentation(imgs_train[idx],imgs_mask_train[idx])
-    #         # plt.subplot(121)
-    #         # plt.imshow(data_batch[img,0])
-    #         # plt.subplot(122)
-    #         # plt.imshow(mask_batch[img,0])
-    #         # plt.show()
-    #         data_batch-=mean
-    #         data_batch/=std
-    #         print(np.histogram(data_batch))
-    #         print(np.histogram(mask_batch))
+        for img in range(batch_size):
+            idx=np.random.randint(total)
+            # data_batch[img,0],mask_batch[img,0]=augmentation(imgs_train[idx],imgs_mask_train[idx])
+            data_batch[img,:,:,0],mask_batch[img,:,:,0]=augmentation(imgs_train[idx],imgs_mask_train[idx])
+            # plt.subplot(121)
+            # plt.imshow(data_batch[img,0])
+            # plt.subplot(122)
+            # plt.imshow(mask_batch[img,0])
+            # plt.show()
+            data_batch-=mean
+            data_batch/=std
+            # print(np.histogram(data_batch))
+            # print(np.histogram(mask_batch))
 
-    #     model.train_on_batch(data_batch,mask_batch)
+        model.train_on_batch(data_batch,mask_batch)
+    # model.train_on_batch(data_batch,mask_batch)
 
     print('-'*30)
     print('Loading and preprocessing test data...')
     print('-'*30)
     imgs_test, imgs_id_test = load_test_data()
-    imgs_test = preprocess(imgs_test) # TODO: bug
+    # imgs_test = preprocess(imgs_test) # TODO: bug
 
     imgs_test = imgs_test.astype('float32')
-    imgs_test -= np.load('/mnt/data1/yihuihe/mnc/mean.npy')
-    imgs_test /=np.load('/mnt/data1/yihuihe/mnc/std.npy')
+    imgs_test -= np.load('/home/chen/u-net/dataset/mean.npy')
+    imgs_test /=np.load('/home/chen/u-net/dataset/std.npy')
 
     print('-'*30)
     print('Loading saved weights...')
     print('-'*30)
-    model.load_weights('unet.hdf5')
+    model.load_weights('/home/chen/u-net/1sttest/unet.hdf5')
 
     print('-'*30)
     print('Predicting masks on test data...')
     print('-'*30)
     imgs_mask_test = model.predict(imgs_test, verbose=1)
-    np.save('imgs_mask_test.npy', imgs_mask_test)
+    np.save('/home/chen/u-net/1sttest/imgs_mask_test.npy', imgs_mask_test)
 
 
 if __name__ == '__main__':
